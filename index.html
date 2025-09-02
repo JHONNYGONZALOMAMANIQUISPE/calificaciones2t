@@ -225,4 +225,65 @@
     }
   </script>
 </body>
+
+<!-- Bloque para Exportar/Importar Notas -->
+<div id="importExportSection" style="display:none; margin-top:20px;">
+  <h3>📥 Importar / Exportar Notas</h3>
+  <button onclick="exportCSV()">⬇️ Descargar plantilla CSV</button>
+  <br><br>
+  <input type="file" id="uploadCSV" accept=".csv" onchange="importCSV(event)">
+</div>
+
+<script>
+  // Descargar plantilla CSV con estudiantes y criterios
+  function exportCSV() {
+    let csv = "Codigo,Nombre,Ser_1,Ser_2,Saber_1,Saber_2,Hacer_1,Hacer_2,Decidir_1,Autoevaluacion,Extras\n";
+    estudiantes.forEach(est => {
+      csv += `${est.codigo},${est.nombre},,,,,,,,,,\n`;
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "notas_plantilla.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Importar CSV con notas y actualizar tabla
+  function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const rows = e.target.result.split("\n").map(r => r.split(","));
+      rows.shift(); // eliminar encabezado
+
+      rows.forEach(row => {
+        if (row.length < 2) return;
+        const codigo = row[0].trim();
+        const estudiante = estudiantes.find(e => e.codigo === codigo);
+        if (estudiante) {
+          estudiante.notas = {
+            ser: row.slice(2, 4).map(Number),
+            saber: row.slice(4, 6).map(Number),
+            hacer: row.slice(6, 8).map(Number),
+            decidir: row[8] ? [Number(row[8])] : [],
+            auto: Number(row[9] || 0),
+            extras: Number(row[10] || 0)
+          };
+        }
+      });
+
+      alert("✅ Notas actualizadas desde CSV");
+      renderNotas();
+    };
+    reader.readAsText(file);
+  }
+</script>
+
+  
 </html>
