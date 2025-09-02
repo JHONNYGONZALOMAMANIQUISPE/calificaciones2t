@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestión de Calificaciones</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; margin:0; padding:0;}
+    header { background:#4CAF50; color:white; padding:10px; text-align:center;}
+    .container { padding:20px;}
+    .hidden { display:none;}
+    table { border-collapse: collapse; width:100%; margin-top:10px;}
+    th, td { border:1px solid #ccc; padding:8px; text-align:center;}
+    th { background:#eee;}
+    .btn { padding:5px 10px; margin:5px; cursor:pointer; border:none; border-radius:5px;}
+    .btn-primary { background:#4CAF50; color:white;}
+    .btn-danger { background:#f44336; color:white;}
+    .btn-secondary { background:#2196F3; color:white;}
+    .section { margin:15px 0; padding:10px; background:#fff; border-radius:8px; box-shadow:0 0 5px rgba(0,0,0,0.1);}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Gestión de Calificaciones</h1>
+  </header>
+
+  <div class="container">
+    <!-- Login -->
+    <div id="loginSection">
+      <h2>Acceso</h2>
+      <label for="codeInput">Ingrese su código:</label>
+      <input type="password" id="codeInput">
+      <button class="btn btn-primary" onclick="login()">Ingresar</button>
+    </div>
+
+    <!-- Vista Admin -->
+    <div id="adminSection" class="hidden">
+      <h2>Administrador</h2>
+      <button class="btn btn-secondary" onclick="logout()">Salir</button>
+      
+      <div class="section">
+        <h3>Gestión de Estudiantes</h3>
+        <div>
+          <h4>Opción 1: Añadir manualmente</h4>
+          <input type="text" id="studentName" placeholder="Nombre del estudiante">
+          <input type="text" id="studentCode" placeholder="Código del estudiante">
+          <button class="btn btn-primary" onclick="addStudent()">Añadir</button>
+        </div>
+        <div>
+          <h4>Opción 2: Cargar CSV</h4>
+          <input type="file" id="csvFile" accept=".csv">
+          <button class="btn btn-secondary" onclick="uploadCSV()">Cargar CSV</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Gestión de Subcriterios</h3>
+        <div>
+          <label>Dimensión:</label>
+          <select id="dimensionSelect">
+            <option value="SER">SER</option>
+            <option value="SABER">SABER</option>
+            <option value="HACER">HACER</option>
+            <option value="DECIDIR">DECIDIR</option>
+          </select>
+          <input type="text" id="subcriterionName" placeholder="Nombre del subcriterio">
+          <button class="btn btn-primary" onclick="addSubcriterion()">Añadir Subcriterio</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Notas</h3>
+        <div id="gradesTableContainer"></div>
+      </div>
+    </div>
+
+    <!-- Vista Estudiante -->
+    <div id="studentSection" class="hidden">
+      <h2>Notas del Estudiante</h2>
+      <button class="btn btn-secondary" onclick="logout()">Salir</button>
+      <div id="studentGrades"></div>
+    </div>
+  </div>
+
+  <script>
+    const ADMIN_CODE = "admin123"; // Aquí se cambia el código del administrador
+    let students = [];
+    let subcriteria = { SER:[], SABER:[], HACER:[], DECIDIR:[] };
+    let grades = {};
+
+    function login() {
+      const code = document.getElementById("codeInput").value;
+      if (code === ADMIN_CODE) {
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("adminSection").classList.remove("hidden");
+        renderTable();
+      } else {
+        const student = students.find(s => s.code === code);
+        if (student) {
+          document.getElementById("loginSection").classList.add("hidden");
+          document.getElementById("studentSection").classList.remove("hidden");
+          showStudentGrades(student);
+        } else {
+          alert("Código inválido");
+        }
+      }
+    }
+
+    function logout() {
+      document.getElementById("loginSection").classList.remove("hidden");
+      document.getElementById("adminSection").classList.add("hidden");
+      document.getElementById("studentSection").classList.add("hidden");
+      document.getElementById("codeInput").value = "";
+    }
+
+    function addStudent() {
+      const name = document.getElementById("studentName").value;
+      const code = document.getElementById("studentCode").value;
+      if (name && code) {
+        students.push({ name, code });
+        grades[code] = { SER:{}, SABER:{}, HACER:{}, DECIDIR:{}, autoeval:0, extra:0 };
+        renderTable();
+        alert("Estudiante agregado");
+      }
+    }
+
+    function uploadCSV() {
+      const file = document.getElementById("csvFile").files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const lines = e.target.result.split("\n");
+        for (let line of lines) {
+          const [name, code] = line.split(",");
+          if (name && code) {
+            students.push({ name, code });
+            grades[code] = { SER:{}, SABER:{}, HACER:{}, DECIDIR:{}, autoeval:0, extra:0 };
+          }
+        }
+        renderTable();
+        alert("CSV cargado");
+      };
+      reader.readAsText(file);
+    }
+
+    function addSubcriterion() {
+      const dim = document.getElementById("dimensionSelect").value;
+      const sub = document.getElementById("subcriterionName").value;
+      if (sub) {
+        subcriteria[dim].push(sub);
+        for (let code in grades) {
+          grades[code][dim][sub] = 0;
+        }
+        renderTable();
+      }
+    }
+
+    function renderTable() {
+      let html = "<table><tr><th>Estudiante</th>";
+      for (let dim in subcriteria) {
+        for (let sub of subcriteria[dim]) {
+          html += `<th>${dim}: ${sub}</th>`;
+        }
+        if (subcriteria[dim].length > 0) {
+          html += `<th>Promedio ${dim}</th>`;
+        }
+      }
+      html += "<th>Autoevaluación (0-5)</th><th>Puntos Extras</th><th>Total (máx. 100)</th></tr>";
+
+      for (let s of students) {
+        html += `<tr><td>${s.name}</td>`;
+        let total = 0;
+        let weights = { SER:5, SABER:45, HACER:40, DECIDIR:5 };
+        for (let dim in subcriteria) {
+          let sum = 0;
+          for (let sub of subcriteria[dim]) {
+            let val = grades[s.code][dim][sub] || 0;
+            html += `<td><input type="number" min="0" max="${weights[dim]}" value="${val}" 
+                     onchange="updateGrade('${s.code}','${dim}','${sub}',this.value)"></td>`;
+            sum += parseFloat(val);
+          }
+          if (subcriteria[dim].length > 0) {
+            let avg = (sum / subcriteria[dim].length).toFixed(2);
+            html += `<td>${avg}</td>`;
+            total += parseFloat(avg);
+          }
+        }
+        html += `<td><input type="number" min="0" max="5" value="${grades[s.code].autoeval}" 
+                 onchange="grades['${s.code}'].autoeval=parseFloat(this.value)||0;renderTable()"></td>`;
+        html += `<td><input type="number" min="0" value="${grades[s.code].extra}" 
+                 onchange="grades['${s.code}'].extra=parseFloat(this.value)||0;renderTable()"></td>`;
+        let final = total + grades[s.code].autoeval + grades[s.code].extra;
+        if (final > 100) final = 100;
+        html += `<td><b>${final.toFixed(2)}</b></td></tr>`;
+      }
+      html += "</table>";
+      document.getElementById("gradesTableContainer").innerHTML = html;
+    }
+
+    function updateGrade(code, dim, sub, val) {
+      grades[code][dim][sub] = parseFloat(val)||0;
+      renderTable();
+    }
+
+    function showStudentGrades(student) {
+      let code = student.code;
+      let html = `<h3>${student.name}</h3><table><tr><th>Dimensión</th><th>Subcriterio</th><th>Nota</th></tr>`;
+      for (let dim in subcriteria) {
+        for (let sub of subcriteria[dim]) {
+          html += `<tr><td>${dim}</td><td>${sub}</td><td>${grades[code][dim][sub]}</td></tr>`;
+        }
+      }
+      html += `<tr><td colspan="2">Autoevaluación</td><td>${grades[code].autoeval}</td></tr>`;
+      html += `<tr><td colspan="2">Puntos Extras</td><td>${grades[code].extra}</td></tr>`;
+      let total = 0;
+      for (let dim in subcriteria) {
+        let sum = 0;
+        for (let sub of subcriteria[dim]) sum += grades[code][dim][sub];
+        if (subcriteria[dim].length > 0) total += sum / subcriteria[dim].length;
+      }
+      total += grades[code].autoeval + grades[code].extra;
+      if (total > 100) total = 100;
+      html += `<tr><td colspan="2"><b>Total</b></td><td><b>${total.toFixed(2)}</b></td></tr>`;
+      html += "</table>";
+      document.getElementById("studentGrades").innerHTML = html;
+    }
+  </script>
+</body>
+</html>
